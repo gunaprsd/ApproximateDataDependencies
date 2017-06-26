@@ -29,41 +29,6 @@ public class PLIBasedDataSet extends AbstractDataSet {
         }
     }
 
-    private class AttributeSetData
-    {
-        public PositionListIndex pli;
-        public double entropy;
-        public boolean entropyComputed;
-
-        public AttributeSetData(PositionListIndex pli) {
-            this.pli = pli;
-            this.entropy = -1;
-            this.entropyComputed = false;
-        }
-
-        public AttributeSetData(PositionListIndex pli, double entropy) {
-            this.pli = pli;
-            this.entropy = entropy;
-            this.entropyComputed = true;
-        }
-
-        public double getEntropy(long totalNumRows) {
-            if(!entropyComputed) {
-                List<LongArrayList> clusters = pli.getClusters();
-                entropy = Math.log(totalNumRows);
-                double removeEntropy =0.0;
-                for(LongArrayList cluster : clusters) {
-                    long size = cluster.size();
-                    removeEntropy += size * Math.log(size);
-                }
-                removeEntropy /= totalNumRows;
-                entropy -= removeEntropy;
-                entropyComputed = true;
-            }
-            return entropy;
-        }
-    }
-
     protected String headerLine;
     protected boolean hasHeader;
     protected String fileName;
@@ -97,15 +62,18 @@ public class PLIBasedDataSet extends AbstractDataSet {
         } catch (IOException e) {
             e.printStackTrace();
         }
+
         for(Map.Entry<IAttributeSet, Double> entry : entropyCache.entrySet()) {
             System.out.println(entry.getKey() + " : " + entry.getValue());
         }
+
         preComputeEntropies();
     }
 
     public void readHeader(BufferedReader reader) throws IOException {
         if(hasHeader) {
             headerLine = reader.readLine();
+            schema.setHeader(headerLine);
         }
     }
 
@@ -171,12 +139,9 @@ public class PLIBasedDataSet extends AbstractDataSet {
         return entropy;
     }
 
-    public void preComputeEntropies()
-    {
-
+    public void preComputeEntropies() {
         for(int i = 0; i < numAttributes; i++) {
             preComputeNextLevelEntropies(schema.getAttributeSet(i));
-
         }
     }
 
@@ -186,7 +151,7 @@ public class PLIBasedDataSet extends AbstractDataSet {
      */
     protected void preComputeNextLevelEntropies(IAttributeSet attributeSet)
     {
-        System.out.printf("Computing entropy for : %s\n", attributeSet);
+        //System.out.printf("Computing entropy for : %s\n", attributeSet);
 
         int lastAttribute = attributeSet.lastAttribute();
         //iterate over all the additional attributes

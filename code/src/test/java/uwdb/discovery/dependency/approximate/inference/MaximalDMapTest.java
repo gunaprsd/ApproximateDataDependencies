@@ -1,32 +1,39 @@
 package uwdb.discovery.dependency.approximate.inference;
 
 import org.junit.Test;
-import uwdb.discovery.dependency.approximate.Utilities;
+import uwdb.discovery.dependency.approximate.Main;
 import uwdb.discovery.dependency.approximate.common.RelationSchema;
 import uwdb.discovery.dependency.approximate.entropy.ExternalFileDataSet;
+import uwdb.discovery.dependency.approximate.entropy.PLIBasedDataSet;
+import uwdb.discovery.dependency.approximate.inference.bayesianmap.BayesianIMap;
 import uwdb.discovery.dependency.approximate.inference.dmap.MaximalDMap;
+import uwdb.discovery.dependency.approximate.interfaces.IAttributeSet;
+
+import java.io.FileOutputStream;
+import java.io.PrintStream;
+import java.util.ArrayList;
+import java.util.Collections;
 
 
 public class MaximalDMapTest {
     @Test
     public void getCDEP() throws Exception {
-        Utilities.initialize();
-        String choice = "horse";
-        RelationSchema schema = new RelationSchema(Utilities.numCols.get(choice));
-        ExternalFileDataSet dataSet = new ExternalFileDataSet(Utilities.filePath.get(choice), schema, true);
+        int numShuffles = 10;
+        Main.initialize();
+        String choice = "test";
+        RelationSchema schema = new RelationSchema(Main.numColsDict.get(choice));
+        PLIBasedDataSet dataSet = new PLIBasedDataSet(Main.filePathDict.get(choice), schema, true);
         dataSet.initialize();
-//        IAttributeSet subset = schema.getAttributeSet(0, 1, 2, 4, 5, 22, 25, 13, 19, 3, 21);
-        MaximalDMap maximalDMap = new MaximalDMap(schema, dataSet);
-        maximalDMap.initialize();
-        maximalDMap.print();
-//        IAttributeSet attrs = schema.getAttributeSet(3, 6, 7);
-//        ArrayList<IAttributeSet> cdep = maximalDMap.getCDEP(attrs);
-//        for(int i = 0; i < schema.getNumAttributes(); i++) {
-//            System.out.printf("%d : %s\n", i, maximalDMap.getPotentialMinimalFD(i));
-//        }
-
-//        PartitionedMaximalDMap pDmap = new PartitionedMaximalDMap(schema, dataSet, 6);
-//        pDmap.initialize();
-//        pDmap.print();
+        ArrayList<Integer> order = schema.getEmptyAttributeSet().complement().getIndices();
+        for(int i = 0; i < numShuffles; i++) {
+            PrintStream outputStream = new PrintStream(new FileOutputStream("graph" + String.valueOf(i+1) + ".csv"));
+            Collections.shuffle(order);
+            BayesianIMap bayesianIMap = new BayesianIMap(schema, dataSet);
+            bayesianIMap.initialize();
+            bayesianIMap.computeBayesianIMap(order);
+            bayesianIMap.moralize();
+            bayesianIMap.printMoralizedGraphAdjacencyMatrix(outputStream, "");
+            outputStream.close();
+        }
     }
 }

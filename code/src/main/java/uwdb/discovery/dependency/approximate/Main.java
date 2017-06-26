@@ -1,11 +1,17 @@
 package uwdb.discovery.dependency.approximate;
 import uwdb.discovery.dependency.approximate.common.*;
 import uwdb.discovery.dependency.approximate.entropy.PLIBasedDataSet;
+import uwdb.discovery.dependency.approximate.inference.bayesianmap.BayesianIMap;
 import uwdb.discovery.dependency.approximate.inference.beeri.BeeriAlgorithmInference;
+import uwdb.discovery.dependency.approximate.interfaces.IAttributeSet;
+import uwdb.discovery.dependency.approximate.interfaces.IDataset;
 import uwdb.discovery.dependency.approximate.interfaces.IInferenceModuleFactory;
 import uwdb.discovery.dependency.approximate.search.TopDownInductiveSearch;
 
-import java.util.HashMap;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.PrintStream;
+import java.util.*;
 
 
 public class Main {
@@ -13,10 +19,9 @@ public class Main {
     public static HashMap<String, Integer> numColsDict;
     public static HashMap<String, String> filePathDict;
 
-    public static void initialize()
-    {
-        numColsDict = new HashMap<String, Integer>();
-        filePathDict = new HashMap<String, String>();
+    public static void initialize() {
+        numColsDict = new HashMap<>();
+        filePathDict = new HashMap<>();
 
         String baseFolder = "/Users/gunaprsd/Source/data/";
 
@@ -45,7 +50,10 @@ public class Main {
         filePathDict.put("flights", baseFolder + "partial_flights.csv");
 
         numColsDict.put("flights2", 11);
-        filePathDict.put("flights2", baseFolder + "partial_flights2.csv");
+        filePathDict.put("flights2", baseFolder + "partial_flights3.csv");
+
+        numColsDict.put("test", 5);
+        filePathDict.put("test", baseFolder + "test.csv");
     }
 
     public static void performSearch(String filePath, int numCols, double alpha) {
@@ -90,11 +98,95 @@ public class Main {
         performSearch(filePath, numCols, alpha);
     }
 
+    protected static ArrayList<Integer> getIncreasingEntropyOrder(RelationSchema schema, IDataset dataset) {
+        HashMap<IAttributeSet, Double> entropyValues = new HashMap<>();
+        for(int i = 0; i < schema.getNumAttributes(); i++) {
+            entropyValues.put(schema.getAttributeSet(i), Double.MAX_VALUE);
+        }
+        dataset.computeEntropies(entropyValues);
+        ArrayList<Map.Entry<IAttributeSet, Double>> list = new ArrayList<>(entropyValues.entrySet());
+        Collections.sort(list, new Comparator<Map.Entry<IAttributeSet, Double>>() {
+            @Override
+            public int compare(Map.Entry<IAttributeSet, Double> o1, Map.Entry<IAttributeSet, Double> o2) {
+                return o2.getValue() - o1.getValue() < 0 ? -1 : 1;
+            }
+        });
+
+        ArrayList<Integer> order = new ArrayList<>();
+        for(Map.Entry<IAttributeSet, Double> entry : list) {
+            order.add(entry.getKey().nextAttribute(0));
+        }
+        return order;
+    }
+
+    public static void findMarkovModelIMaps(String choice) {
+        int numShuffles = 50;
+        RelationSchema schema = new RelationSchema(Main.numColsDict.get(choice));
+        PLIBasedDataSet dataSet = new PLIBasedDataSet(Main.filePathDict.get(choice), schema, true);
+        dataSet.initialize();
+        ArrayList<Integer> order = schema.getEmptyAttributeSet().complement().getIndices();
+        String baseFolder = "/Users/gunaprsd/Source/graph_plots/";
+        for(int i = 0; i < numShuffles; i++) {
+            PrintStream outputStream = null;
+            try {
+                String id = "graph" + String.valueOf(i+1);
+                outputStream = new PrintStream(new FileOutputStream(baseFolder + id + ".csv"));
+                Collections.shuffle(order);
+                BayesianIMap bayesianIMap = new BayesianIMap(schema, dataSet);
+                bayesianIMap.initialize();
+                bayesianIMap.computeBayesianIMap(order);
+                bayesianIMap.moralize();
+                bayesianIMap.printMoralizedGraphAdjacencyMatrix(outputStream, id);
+                outputStream.close();
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    public static void findMarkovModelIMapIncreasingEntropyOrder(String choice) {
+        RelationSchema schema = new RelationSchema(Main.numColsDict.get(choice));
+        PLIBasedDataSet dataSet = new PLIBasedDataSet(Main.filePathDict.get(choice), schema, true);
+        dataSet.initialize();
+        ArrayList<Integer> order = new ArrayList<>();
+        order.add(0);
+        order.add(1);
+        order.add(3);
+        order.add(2);
+        order.add(4);
+        order.add(5);
+        order.add(6);
+        order.add(7);
+        order.add(8);
+        order.add(9);
+        order.add(10);
+        String baseFolder = "/Users/gunaprsd/Source/graph_plots/";
+        PrintStream outputStream = null;
+        try {
+            String id = "graph";
+            outputStream = new PrintStream(new FileOutputStream(baseFolder + id + ".csv"));
+            BayesianIMap bayesianIMap = new BayesianIMap(schema, dataSet);
+            bayesianIMap.initialize();
+            bayesianIMap.computeBayesianIMap(order);
+            //bayesianIMap.computeBayesianIMapGreedyOrdering();
+            bayesianIMap.moralize();
+            bayesianIMap.print();
+            bayesianIMap.printMoralizedGraphAdjacencyMatrix(outputStream, id);
+            outputStream.close();
+            bayesianIMap.findCliques();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+    }
+
     public static void main(String[] args) {
         initialize();
-        performSearch("chess", 1E-6);
+        //findMarkovModelIMaps("flights2");
+        findMarkovModelIMapIncreasingEntropyOrder("flights2");
+        //performSearch("test", 1E-6);
         //performSearch(args);
         //printLattice();
         //test(args);
     }
+    
 }
